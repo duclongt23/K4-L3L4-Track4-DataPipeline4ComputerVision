@@ -7,11 +7,11 @@
 | Họ và tên | Nguyễn Đức Long |
 | MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | 2A202602917 |
 | GitHub | duclongt23 |
-| Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `<điền: trip-xxxxx>` |
+| Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | trip-02134 | MSSV đầy đủ là 2A202602917, chứa ký tự A nên không thể chuyển trực tiếp bằng int() theo lệnh mẫu trong GUIDE.md sử dụng 5 chữ số cuối 02917.
 
 ## Kết quả cuối
 
-- `dataset_version` của bạn: `<điền>`  (phải khớp `report/evidence/run_summary.json`)
+- `dataset_version` của bạn: `8f4b67f9f636`  (phải khớp `report/evidence/run_summary.json`)
 - Số khung hình train / val / test của bạn: `<điền>`
 - `report/verify.txt`: tạo bằng `python3 scripts/check_submission.py --save-verify` (phải có `27/27 checks passed`).
 - Ảnh chụp trong `report/screenshots/`: `airflow_graph.png`, `minio_lake.png`, `metabase_dashboard.png`, và ảnh bài tập sập/chạy lại (log task đỏ thấy trip của bạn).
@@ -81,33 +81,57 @@ Chia theo frame gây data leakage vì các khung liên tiếp trong cùng trip c
 ### Câu 7
 Vì sao `dataset_version` là **băm nội dung** chứ không phải ngày giờ hay số đếm? Hai lần chạy liên tiếp cho kết quả gì? Vì sao `dataset_version` của bạn **khác** bạn bè dù cùng dữ liệu (liên hệ MSSV)?
 
-(trả lời ở đây)
+`dataset_version` được tạo từ hash nội dung và thông tin phân chia dataset, thay vì timestamp, giúp nhận diện chính xác một phiên bản dữ liệu và tái lập kết quả. Khi export lại cùng dữ liệu, cùng MSSV và cùng cấu hình, `dataset_version` không đổi.
+
+MSSV tham gia vào quá trình phân chia các trip thành train/val/test. Do đó, mặc dù cùng dữ liệu đầu vào, mỗi sinh viên có thể nhận được cách phân chia khác nhau, dẫn đến nội dung manifest và `dataset_version` khác nhau.
 
 ### Câu 8
 Đọc phần `lineage` trong `manifest.json` của dataset bạn. Trả lời "dataset này được tạo từ dữ liệu nào?" bằng chính nội dung đó. Nếu một người hỏi 3 tháng sau, thông tin nào giúp tái tạo lại đúng dataset này?
 
 (trả lời ở đây)
+Dataset phiên bản `8f4b67f9f636` được tạo từ video và telemetry của hai nguồn `drive_a`, `drive_b`, qua các bước Bronze → Silver → Gold. Kết quả gồm 1.019 frame thuộc 26 trip, chia train/val/test lần lượt 702/189/128 frame.
+
+Thông tin lineage trong `manifest.json` cho phép truy vết các phiên bản bảng Delta đầu vào và danh tính video nguồn thông qua SHA256. Để tái tạo dataset sau ba tháng, cần lưu manifest, dữ liệu nguồn tương ứng, phiên bản pipeline, cấu hình xử lý, quy tắc chia theo trip và MSSV `2A202602917`. Đối chiếu `dataset_version` và hash manifest giúp kiểm tra tính nhất quán của kết quả.
 
 ## Bước 5 · Điều phối và phục vụ
 
 ### Câu 9
 Mô tả chính xác điều xảy ra khi trip của bạn sập rồi chạy lại: bao nhiêu task chuyển đỏ, bao nhiêu task `upstream_failed`, bạn clear gì, dữ liệu có nhân đôi không, `dataset_version` có đổi không? Bằng chứng (ảnh, số) là gì?
 
-(trả lời ở đây)
+Tôi sử dụng `trip-02134` cho thí nghiệm crash/retry, chọn từ năm chữ số cuối MSSV (`02917 % 26 = 5`).
+
+Khi đặt `LAB_FAIL_ONCE=trip-02134`, task `silver_frames[5]` thất bại với lỗi `RuntimeError: simulated crash while extracting trip-02134`. Các task phụ thuộc không thể hoàn thành cho đến khi lỗi được xử lý.
+
+Tôi chỉ clear task `silver_frames[5]`. Khi chạy lại, task thành công và DAG phục hồi. Cơ chế ghi Delta theo partition bảo đảm không nhân đôi dữ liệu khi xử lý lại trip. Pipeline được kiểm tra lại sau khôi phục và hoạt động bình thường.
+
+8f4b67f9f636
 
 ### Câu 10
 Nâng từ 2 drive lên **500 xe mỗi ngày**: ba thành phần nào của pipeline này sẽ vỡ đầu tiên, và bạn thay bằng gì (nối với slide 12, 22, 23)?
 
-(trả lời ở đây)
+Nếu mở rộng lên 500 xe/ngày, ba thành phần có nguy cơ quá tải sớm là:
+
+1. **Video decoding bằng FFmpeg:** lượng video và frame tăng mạnh, tiêu tốn CPU, RAM và I/O.
+2. **Object storage và đường truyền dữ liệu:** số lượng video/frame lớn làm tăng dung lượng, request và băng thông truyền tải.
+3. **Airflow và xử lý dữ liệu:** số trip, partition và task tăng khiến thời gian lập lịch, xử lý và quản lý metadata lớn hơn.
+
+Tôi đề xuất tăng song song hóa worker xử lý frame, tách compute khỏi storage, dùng queue để điều tiết tải và theo dõi throughput, độ trễ, tài nguyên và số task thất bại.
 
 ## Câu hỏi riêng của bạn trên Metabase
 
 Câu SQL bạn thêm vào dashboard và điều nó cho biết:
 
-(trả lời ở đây)
+Câu hỏi riêng trên Metabase: Số lượng trip của mỗi drive có cân bằng không?
+Tôi sử dụng SQL trên bảng marts.mart_trip_summary, nhóm theo drive_id và đếm số trip bằng COUNT(*).
+
+Kết quả: drive_a có 13 trip, drive_b có 13 trip, tổng cộng 26 trip. Hai nguồn có số lượng trip cân bằng tuyệt đối (50% mỗi nguồn), nhưng điều này chưa bảo đảm số frame hoặc phân bố điều kiện lái xe cũng cân bằng.
 
 ## Nhìn lại
 
 Điều bạn thấy bất ngờ nhất, điều gì còn chưa rõ, và một lỗi dữ liệu mà bạn nghĩ pipeline **chưa** bắt được (nếu có). Tối đa 8 dòng.
 
-(trả lời ở đây)
+Điều tôi bất ngờ nhất là pipeline đạt 27/27 kiểm tra nhưng vẫn có nguy cơ leakage nếu chia dữ liệu sai. Tôi cũng hiểu rõ hơn về idempotency khi chạy lại task mà không bị trùng dữ liệu.
+
+Tôi vẫn chưa rõ cách chọn ngưỡng dHash phù hợp khi điều kiện video thay đổi. Ngoài ra, pipeline có thể chưa phát hiện được camera bị lệch hoặc che khuất dù ảnh vẫn đủ sáng và rõ nét.
+
+Qua bài lab, tôi nhận ra pipeline chạy thành công chưa chắc dữ liệu đã đáng tin cậy.

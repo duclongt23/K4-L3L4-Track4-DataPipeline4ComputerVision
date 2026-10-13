@@ -22,3 +22,6 @@ dataset/*.zip
 
 # Local report verification artifacts
 report/evidence/test_write
+
+# Exclude all nested lab datasets
+dataset/data/
