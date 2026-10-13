@@ -1,0 +1,21 @@
+{
+  "source": "yaak-ai/L2D-v3 (Apache-2.0), front_left camera, re-encoded to 640x360 10 fps; timeline re-based per drive",
+  "drives": {
+    "drive_a": {
+      "video": "drive_a.mp4",
+      "telemetry": "telemetry_a.csv",
+      "duration_s": 300.1,
+      "video_start_utc": "2025-10-07T08:00:00+00:00",
+      "fps": 10,
+      "telemetry_clock_offset_ms": 0
+    },
+    "drive_b": {
+      "video": "drive_b.mp4",
+      "telemetry": "telemetry_b.csv",
+      "duration_s": 321.4,
+      "video_start_utc": "2025-10-08T14:30:00+00:00",
+      "fps": 10,
+      "telemetry_clock_offset_ms": 1500
+    }
+  }
+}
