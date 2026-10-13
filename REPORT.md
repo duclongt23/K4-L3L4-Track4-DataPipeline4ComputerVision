@@ -52,25 +52,31 @@ Thí nghiệm chứng minh rằng quality gate có thể chặn dữ liệu khô
 ### Câu 4
 Dựa vào `idempotency.json`: số dòng trước và sau hai lần chạy lại, và khi ghi kiểu `append`. Vì sao Delta `overwrite` theo partition (một trip) an toàn hơn xoá rồi ghi lại, nhất là khi giữa chừng có lỗi?
 
-(trả lời ở đây)
+Thí nghiệm trên `trip-00003` cho thấy bảng có 1.246 dòng trước và sau hai lần chạy lại, không thay đổi. Fingerprint trước và sau đều là `6c7480dfde7e`, chứng minh dữ liệu giữ nguyên.
+
+Riêng trip được thử nghiệm có 60 dòng. Khi mô phỏng ghi `append` hai lần, số dòng tăng thành 120, gây trùng dữ liệu. Delta `overwrite` theo partition an toàn hơn vì thay thế dữ liệu của một trip bằng một transaction nguyên tử, tránh trạng thái ghi dở nếu xảy ra lỗi và không ảnh hưởng các partition khác.
 
 ### Câu 5
 Khung hình **đen** và khung hình **tối** khác nhau thế nào, pipeline xử lý khác nhau ra sao, bạn có đồng ý không? Dựa vào `threshold.json`: nếu chọn ngưỡng 0, 2, 6 thì bao nhiêu khung bị coi là trùng ở mỗi drive? Bạn chọn ngưỡng nào, vì sao, và ngưỡng đó phụ thuộc vào tốc độ xe thế nào?
 
 | dHash khác tối đa | số khung trùng, drive A | số khung trùng, drive B |
 |---|---|---|
-| 0 | | |
-| 2 | | |
-| 6 | | |
+| 0 |61 |8 |
+| 2 |149 |53 |
+| 6 |363 |244 |
 
-(trả lời ở đây)
+Khung đen là khung gần như không chứa thông tin hình ảnh hữu ích, thường do mất tín hiệu hoặc lỗi camera, nên pipeline loại bỏ. Khung tối vẫn có thể chứa thông tin quan trọng như đường hầm, bóng râm hoặc cảnh ban đêm, nên được giữ lại và gắn cờ chất lượng. Tôi đồng ý vì loại bỏ mọi khung tối sẽ gây thiên lệch dữ liệu.
+
+Với ngưỡng dHash 0, drive A/B lần lượt có 61/8 khung trùng; ngưỡng 2 có 149/53; ngưỡng 6 có 363/244. Tôi chọn ngưỡng 2 vì cân bằng giữa loại bỏ khung gần giống nhau và giữ lại các thay đổi cảnh có ý nghĩa. Khi xe chạy chậm hoặc camera đứng hình, các khung liên tiếp giống nhau nhiều hơn; khi xe chạy nhanh, cảnh thay đổi lớn hơn, nên ngưỡng phù hợp có thể cần điều chỉnh theo tốc độ và FPS.
 
 ## Bước 4 · Gold
 
 ### Câu 6
 Dựa vào `leakage.json`: chia theo khung hình làm bao nhiêu trip bị chia cắt, so với chia theo trip? Vì sao điều này làm điểm kiểm thử đẹp một cách giả tạo?
 
-(trả lời ở đây)
+Thí nghiệm sử dụng 1.019 khung được giữ lại từ 26 trip. Khi chia ngẫu nhiên theo frame, cả 26/26 trip đều bị chia qua nhiều tập, đồng thời xuất hiện ở cả train và test. Khi chia theo trip, số trip bị chia cắt bằng 0.
+
+Chia theo frame gây data leakage vì các khung liên tiếp trong cùng trip có bối cảnh, thời tiết, góc camera và đối tượng rất giống nhau. Model có thể nhận diện lại các đặc điểm đã thấy khi huấn luyện, khiến kết quả test cao giả tạo. Chia theo trip giúp đánh giá khả năng tổng quát hóa đáng tin cậy hơn.
 
 ### Câu 7
 Vì sao `dataset_version` là **băm nội dung** chứ không phải ngày giờ hay số đếm? Hai lần chạy liên tiếp cho kết quả gì? Vì sao `dataset_version` của bạn **khác** bạn bè dù cùng dữ liệu (liên hệ MSSV)?
