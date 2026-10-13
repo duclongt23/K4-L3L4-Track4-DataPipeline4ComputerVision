@@ -88,10 +88,13 @@ MSSV tham gia vào quá trình phân chia các trip thành train/val/test. Do đ
 ### Câu 8
 Đọc phần `lineage` trong `manifest.json` của dataset bạn. Trả lời "dataset này được tạo từ dữ liệu nào?" bằng chính nội dung đó. Nếu một người hỏi 3 tháng sau, thông tin nào giúp tái tạo lại đúng dataset này?
 
-(trả lời ở đây)
-Dataset phiên bản `8f4b67f9f636` được tạo từ video và telemetry của hai nguồn `drive_a`, `drive_b`, qua các bước Bronze → Silver → Gold. Kết quả gồm 1.019 frame thuộc 26 trip, chia train/val/test lần lượt 702/189/128 frame.
+Dataset của tôi có `dataset_version = 8f4b67f9f636`, gồm 1.019 frames từ 26 trips, chia train/val/test lần lượt là 702/189/128 frames.
 
-Thông tin lineage trong `manifest.json` cho phép truy vết các phiên bản bảng Delta đầu vào và danh tính video nguồn thông qua SHA256. Để tái tạo dataset sau ba tháng, cần lưu manifest, dữ liệu nguồn tương ứng, phiên bản pipeline, cấu hình xử lý, quy tắc chia theo trip và MSSV `2A202602917`. Đối chiếu `dataset_version` và hash manifest giúp kiểm tra tính nhất quán của kết quả.
+Theo `manifest.json`, dữ liệu được tạo từ các bảng Bronze: `raw_telemetry_a` (v0), `raw_telemetry_b` (v0), `trips_raw` (v0), `video_files` (v1); và các bảng Silver: `frames` (v25), `telemetry` (v0), `frames_flagged` (v0), `frame_telemetry` (v0).
+
+Hai video nguồn được xác định bằng SHA256: `drive_a = 636ba1a98dfc5ba665d1c935e1d2064e69f4df360ff9ffbd15795957d5e7e9aa` và `drive_b = bfa62703f645ff77a8578ae3fc74a00881140d38a404d43c8e2af265bbee9fdc`.
+
+Để tái tạo chính xác dataset sau 3 tháng, cần lưu `manifest.json`, các phiên bản bảng Delta, video nguồn có SHA256 tương ứng, mã nguồn và cấu hình pipeline, cùng MSSV `2A202602917` dùng để xác định split. Sau khi tái tạo, đối chiếu `dataset_version` và `manifest_sha256` để xác minh kết quả nhất quán.
 
 ## Bước 5 · Điều phối và phục vụ
 
